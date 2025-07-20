@@ -1,9 +1,10 @@
+#Usage: python tesseract_test.py <filename>
+
 import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
 import pdfplumber
 import re
 import sys
-import os
 from pathlib import Path
 import io
 
