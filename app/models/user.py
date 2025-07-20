@@ -12,11 +12,13 @@ class User(Base):
     username = Column(String)
 
     # Relationships
-    teams = relationship(
-        "Team",
-        secondary=team_members,
-        back_populates="members"
-    )
+    #teams = relationship(
+    #    "Team",
+    #    secondary=team_members,
+    #    back_populates="members"
+    #)
+
+    team_memberships = relationship("TeamMember", back_populates="user")
 
     def __repr__(self):
         return f"<User(id={self.id}, username={self.username})>"

@@ -2,7 +2,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.user import UserRepository
 from app.models.user import User
-from app.core.logging import logger
 
 
 class UserService:
@@ -12,25 +11,28 @@ class UserService:
     async def get_or_create_user(
             self,
             user_id: int,
-            username: str | None,
-            first_name: str | None,
-            last_name: str | None
+            username: str | None
     ) -> User:
         async with self.session_factory() as session:
-            repository = UserRepository(session)
-            user = await repository.get_by_telegram_id(user_id)
-
-            if not user:
-                user = await repository.create(
-                    telegram_id=user_id,
-                    username=username,
-                    first_name=first_name,
-                    last_name=last_name
-                )
-                await session.commit()
-                logger.info(f"Created new user: {user_id}")
-
-            return user
+            try:
+                repository = UserRepository(session)
+                
+                user = await repository.get_by_telegram_id(user_id)
+                
+                if user:
+                    return user
+                
+                try:
+                    user = await repository.create_from_telegram(
+                        telegram_id=user_id,
+                        username=username
+                    )
+                except Exception:
+                    raise
+                
+                return user
+            except Exception:
+                raise
 
     async def get_user(self, user_id: int) -> User | None:
         async with self.session_factory() as session:

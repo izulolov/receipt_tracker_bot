@@ -21,11 +21,23 @@ class BaseRepository:
         return result.scalars().all()
 
     async def create(self, **kwargs) -> ModelType:
-        instance = self.model(**kwargs)
-        self.session.add(instance)
-        await self.session.commit()
-        await self.session.refresh(instance)
-        return instance
+        try:
+            instance = self.model(**kwargs)
+            self.session.add(instance)
+            
+            try:
+                await self.session.commit()
+            except Exception:
+                raise
+            
+            try:
+                await self.session.refresh(instance)
+            except Exception:
+                raise
+            
+            return instance
+        except Exception:
+            raise
 
     async def update(self, id: int, **kwargs) -> Optional[ModelType]:
         stmt = (

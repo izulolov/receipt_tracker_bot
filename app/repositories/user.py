@@ -10,8 +10,12 @@ class UserRepository(BaseRepository):
 
     async def get_by_telegram_id(self, telegram_id: int) -> Optional[User]:
         stmt = select(User).where(User.telegram_id == telegram_id)
-        result = await self.session.execute(stmt)
-        return result.scalars().first()
+        try:
+            result = await self.session.execute(stmt)
+            user = result.scalars().first()
+            return user
+        except Exception:
+            raise
 
     async def get_by_username(self, username: str) -> Optional[User]:
         stmt = select(User).where(User.username == username)
@@ -21,12 +25,13 @@ class UserRepository(BaseRepository):
     async def create_from_telegram(
             self,
             telegram_id: int,
-            username: str,
-            full_name: str
+            username: str
     ) -> User:
-        user = await self.create(
-            telegram_id=telegram_id,
-            username=username,
-            full_name=full_name
-        )
-        return user
+        try:
+            user = await self.create(
+                telegram_id=telegram_id,
+                username=username
+            )
+            return user
+        except Exception:
+            raise
