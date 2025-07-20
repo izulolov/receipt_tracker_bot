@@ -9,8 +9,9 @@ router = Router()
 @router.message(CommandStart())
 async def cmd_start(message: types.Message):
     try:
+        name = message.from_user.first_name
         await message.answer(
-            "👋 Welcome! I'm your receipt management bot.\n\n"
+            f"👋 Welcome {name}! I'm your receipt management bot.\n\n"
             "Here's what I can do:\n"
             "/upload_receipt - Upload a new receipt\n"
             "/list_receipts - View your receipts\n"

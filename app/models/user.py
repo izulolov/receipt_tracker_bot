@@ -18,6 +18,7 @@ class User(Base):
     #    back_populates="members"
     #)
 
+    # Возможно это решение временное. Разберемся потом
     team_memberships = relationship("TeamMember", back_populates="user")
 
     def __repr__(self):
