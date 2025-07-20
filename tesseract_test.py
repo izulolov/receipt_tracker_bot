@@ -27,82 +27,123 @@ def preprocess_image(image):
 
 # Function to extract transaction details
 def extract_transaction_details(text):
-    details = {}
-
-    # Сначала выведем текст для отладки
-    print("Извлеченный текст:")
-    print("----------------------------")
-    print(text)
-    print("----------------------------")
-
-    # Улучшенные регулярные выражения с учетом формата
-    transaction_id_match = re.search(r"(?:Номер транзакции)\s*\n?\s*(\d+)", text)
+    # Словарь для хранения всех извлеченных данных
+    extracted_data = {}
     
-    date_match = re.search(r"(?:Дата и время:)\s*\n?\s*(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})", text)
+    # Определение банка
+    if "Алиф" in text:
+        bank_type = "Алиф Банк"
+    elif "Душанбе Сити" in text or "DUSHANBE" in text:
+        bank_type = "Душанбе Сити Банк"
+    else:
+        bank_type = "Неизвестный банк"
     
-    # Ищем сумму
-    amount_match = re.search(r"(?:Сумма|Итого)\s*\n?\s*([\d,.]+)\s*с\.", text)
+    # Извлечение даты и времени
+    date_match = re.search(r"(?:Дата и время:|Дата операции:)\s*\n?\s*(\d{2}\.\d{2}\.\d{4})", text)
+    time_match = re.search(r"(?:Дата и время:.*?|Время операции:)\s*\n?\s*(\d{2}:\d{2}(?::\d{2})?)", text)
     
-    # Ищем счет зачисления
-    account_match = re.search(r"(?:Счёт зачисления)\s*\n?\s*(\+?\d+)", text)
+    # Формирование поля datetime
+    if date_match and time_match:
+        extracted_data["datetime"] = f"{date_match.group(1)} {time_match.group(1)}"
+    elif date_match:
+        extracted_data["datetime"] = date_match.group(1)
+    elif time_match:
+        extracted_data["datetime"] = time_match.group(1)
+    else:
+        extracted_data["datetime"] = ""
     
-    # Ищем способ оплаты (карту)
-    card_match = re.search(r"(?:Способ оплаты)\s*\n?\s*(\d+\*+\w+\*+\d+)", text)
-    
-    # Ищем статус операции
-    status_match = re.search(r"(ИСПОЛНЕНО|ВЫПОЛНЕНО|Успешно)", text, re.IGNORECASE)
-    
-    # Ищем название банка
-    bank_match = re.search(r"ОАО\s*«([^»]+)»", text)
-    
-    # Ищем имя получателя
-    recipient_match = re.search(r"(?:Перевод на счёт)\s*\n?\s*([^\n]+)", text)
-    
-    # Ищем комиссию
-    commission_match = re.search(r"(?:Комиссия)\s*\n?\s*(\d+\s*с\.)", text)
-    
-    # Ищем БИК
-    bik_match = re.search(r"(?:БИК:)\s*(\d+)", text)
-    
-    # Ищем ИНН
-    inn_match = re.search(r"(?:ИНН:)\s*(\d+)", text)
-
-    if transaction_id_match:
-        details["transaction_id"] = transaction_id_match.group(1)
-    if date_match:
-        details["datetime"] = date_match.group(1)
+    # Извлечение суммы операции
+    amount_match = re.search(r"(?:Сумма|Сумма операции:|Итого)\s*\n?\s*([\d,.]+)\s*(?:с\.|сомони)?", text)
     if amount_match:
-        details["amount"] = amount_match.group(1) + " с."
-    if account_match:
-        details["account"] = account_match.group(1)
-    if card_match:
-        details["card"] = card_match.group(1)
-    if status_match:
-        details["status"] = status_match.group(1)
-    if bank_match:
-        details["bank"] = bank_match.group(1).strip()
-    if recipient_match:
-        details["recipient"] = recipient_match.group(1).strip()
-    if commission_match:
-        details["commission"] = commission_match.group(1)
-    if bik_match:
-        details["bik"] = bik_match.group(1)
-    if inn_match:
-        details["inn"] = inn_match.group(1)
-
-    # Если не нашли сумму стандартным способом, попробуем альтернативный подход
-    if "amount" not in details:
-        # Ищем "25 с." после "Итого"
-        alt_amount_match = re.search(r"Итого\s*\n\s*([\d,.]+)\s*с\.", text)
-        if alt_amount_match:
-            details["amount"] = alt_amount_match.group(1) + " с."
+        extracted_data["amount"] = amount_match.group(1).strip()
+    else:
+        extracted_data["amount"] = ""
+    
+    # Извлечение номера операции
+    operation_number_match = re.search(r"(?:Номер транзакции|Номер операции:)\s*\n?\s*([0-9/]+)", text)
+    if operation_number_match:
+        extracted_data["operation_number"] = operation_number_match.group(1)
+    else:
+        extracted_data["operation_number"] = ""
+    
+    # Извлечение отправителя
+    sender_match = re.search(r"(?:Счет отправителя:|Способ оплаты)\s*\n?\s*([0-9*]+\S*)", text)
+    if sender_match:
+        extracted_data["sender"] = sender_match.group(1).strip()
+    else:
+        extracted_data["sender"] = ""
+    
+    # Извлечение получателя (разная логика для разных банков)
+    if bank_type == "Алиф Банк":
+        # Для Алиф Банка получатель - это ФИО
+        recipient_match = re.search(r"Перевод на счёт\s*\n?\s*([^\n]+)", text)
+        if recipient_match:
+            # Удаляем слово "слуга" из имени получателя
+            recipient_name = recipient_match.group(1).strip()
+            recipient_name = recipient_name.replace("слуга", "").strip()
+            extracted_data["receiver"] = recipient_name
         else:
-            # Ищем любое число с "с." после него
-            any_amount_match = re.search(r"(\d+)\s*с\.", text)
-            if any_amount_match:
-                details["amount"] = any_amount_match.group(1) + " с."
+            extracted_data["receiver"] = ""
+    else:
+        # Для Душанбе Сити получатель - это номер телефона
+        receiver_match = re.search(r"(?:Счет получателя:|Счёт зачисления)\s*\n?\s*(992\d+)", text)
+        if receiver_match:
+            extracted_data["receiver"] = receiver_match.group(1).strip()
+        else:
+            extracted_data["receiver"] = ""
+    
+    # Извлечение статуса операции
+    status_match = re.search(r"(?:Статус:\s*\n?\s*|ЭЛЕКТРОННЫЙ ПЛАТЕЖ\s*\n?\s*)(ИСПОЛНЕНО|ВЫПОЛНЕНА|Успешный)", text, re.IGNORECASE)
+    if status_match:
+        extracted_data["status"] = status_match.group(1).strip()
+    else:
+        extracted_data["status"] = ""
+    
+    # Извлечение примечаний (если есть)
+    notes_match = re.search(r"(?:Примечание|Назначение платежа):\s*\n?\s*([^\n]+)", text)
+    if notes_match:
+        extracted_data["notes"] = notes_match.group(1).strip()
+    else:
+        extracted_data["notes"] = ""
+    
+    # Извлечение организации
+    org_match = re.search(r"(?:ЗАО|ОАО)\s+\"([^\"]+)\"", text)
+    if org_match:
+        extracted_data["organization"] = org_match.group(1).strip()
+    else:
+        extracted_data["organization"] = bank_type
+    
+    # Извлечение комиссии (если есть)
+    fee_match = re.search(r"(?:Комиссия)\s*\n?\s*([^\n]+)", text)
+    if fee_match:
+        fee_value = fee_match.group(1).strip()
+        # Удаляем "с." из значения комиссии
+        fee_value = re.sub(r'\s*с\.', '', fee_value).strip()
+        
+        # Проверяем, равна ли комиссия нулю или букве "О"
+        if "0" in fee_value or "0.00" in fee_value or fee_value == "О" or fee_value == "о":
+            extracted_data["fee"] = "0"
+        else:
+            extracted_data["fee"] = fee_value
+    else:
+        # Если поле комиссии отсутствует, устанавливаем значение "0"
+        extracted_data["fee"] = "0"
+    
+    # Формирование результата в заданном порядке
+    result = {
+        "datetime": extracted_data["datetime"],
+        "amount": extracted_data["amount"],
+        "operation_number": extracted_data["operation_number"],
+        "sender": extracted_data["sender"],
+        "receiver": extracted_data["receiver"],
+        "status": extracted_data["status"],
+        "notes": extracted_data["notes"],
+        "organization": extracted_data["organization"],
+        "fee": extracted_data["fee"]
+    }
+    
+    return result
 
-    return details
 
 # Function to extract text from an image
 def extract_text_from_image(image_path):
