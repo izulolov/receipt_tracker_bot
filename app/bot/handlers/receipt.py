@@ -29,7 +29,7 @@ def setup_receipt_handlers(
 
     # Handle file upload (after command)
     router.message.register(
-        handlers.handle_file,
+        handlers.cmd_upload_receipt,
         F.document | F.photo
     )
 
@@ -39,40 +39,6 @@ def setup_receipt_handlers(
     )
 
     return router
-
-async def handle_file(self, message: Message):
-    """Handle file upload."""
-    try:
-        file = message.document or message.photo[-1]
-        if not await self._validate_file(message, file):
-            return
-
-        # Download file
-        file_obj = await message.bot.get_file(file.file_id)
-        file_content = await message.bot.download_file(file_obj.file_path)
-
-        # Process receipt
-        receipt, status_message = await self.receipt_service.process_receipt(
-            telegram_id=message.from_user.id,
-            file_data=file_content,
-            filename=file_obj.file_path.split('/')[-1]
-        )
-
-        if receipt:
-            await message.reply(
-                f"Receipt processed successfully!\n"
-                f"Amount: {receipt.amount}\n"
-                f"Date: {receipt.date.strftime('%Y-%m-%d')}\n"
-                f"Status: {receipt.status}"
-            )
-        else:
-            await message.reply(f"Failed to process receipt: {status_message}")
-
-    except Exception as e:
-        logger.error(f"Error processing receipt: {e}", exc_info=True)
-        await message.reply(
-            "An error occurred while processing the receipt. "
-            "Please try again later.")
 
 
 class ReceiptHandlers:
