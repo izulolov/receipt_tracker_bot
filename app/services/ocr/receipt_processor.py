@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Any
+import re
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import logger
@@ -74,36 +75,114 @@ class ReceiptProcessor:
             date = date_value
         elif isinstance(date_value, str):
             try:
-                date = datetime.strptime(date_value, '%Y-%m-%d')
-            except ValueError:
-                try:
-                    date = datetime.strptime(date_value, '%d.%m.%Y')
-                except ValueError:
+                # Пробуем разные форматы даты
+                for fmt in ['%d.%m.%Y %H:%M:%S', '%d.%m.%Y %H:%M', '%d.%m.%Y', '%Y-%m-%d']:
+                    try:
+                        date = datetime.strptime(date_value, fmt)
+                        break
+                    except ValueError:
+                        continue
+                else:  # Если ни один формат не подошел
                     date = datetime.now()
+            except Exception:
+                date = datetime.now()
         else:
             date = datetime.now()
         
         # Обрабатываем сумму
         amount = ocr_data.get('amount')
         if amount is not None:
-            amount = Decimal(str(amount))
+            if isinstance(amount, str):
+                # Удаляем все нецифровые символы, кроме точки и запятой
+                amount = re.sub(r'[^\d.,]', '', amount)
+                # Заменяем запятую на точку
+                amount = amount.replace(',', '.')
+                try:
+                    amount = Decimal(amount)
+                except:
+                    amount = Decimal('0')
+            else:
+                try:
+                    amount = Decimal(str(amount))
+                except:
+                    amount = Decimal('0')
+        else:
+            amount = Decimal('0')
+        
+        # Проверяем, что сумма не слишком маленькая (не является датой)
+        if amount < 1:
+            # Возможно, это дата, а не сумма. Ищем другое число в данных
+            raw_text = ocr_data.get('raw_text', '')
+            if raw_text:
+                # Ищем числа, которые могут быть суммами
+                amount_matches = re.findall(r'\b(\d+[\.,]\d{2})\b', raw_text)
+                if amount_matches:
+                    # Исключаем числа, похожие на даты (например, 16.07)
+                    filtered_amounts = []
+                    for match in amount_matches:
+                        parts = match.replace(',', '.').split('.')
+                        if len(parts) == 2:
+                            # Если первая часть больше 31, это вероятно сумма, а не дата
+                            if int(parts[0]) > 31:
+                                filtered_amounts.append(float(match.replace(',', '.')))
+                            # Если после точки больше 2 цифр, это не дата
+                            elif len(parts[1]) > 2:
+                                filtered_amounts.append(float(match.replace(',', '.')))
+                            # Если после точки ровно 2 цифры и число большое, это вероятно сумма
+                            elif len(parts[1]) == 2 and float(match.replace(',', '.')) > 100:
+                                filtered_amounts.append(float(match.replace(',', '.')))
+                    
+                    if filtered_amounts:
+                        # Берем максимальное значение как сумму
+                        amount = Decimal(str(max(filtered_amounts)))
         
         # Обрабатываем комиссию
         fee = ocr_data.get('fee')
         if fee is not None:
-            fee = Decimal(str(fee))
+            if isinstance(fee, str):
+                # Удаляем все нецифровые символы, кроме точки и запятой
+                fee = re.sub(r'[^\d.,]', '', fee)
+                # Заменяем запятую на точку
+                fee = fee.replace(',', '.')
+                if fee:
+                    try:
+                        fee = Decimal(fee)
+                    except:
+                        fee = None
+                else:
+                    fee = Decimal('0')
+            else:
+                try:
+                    fee = Decimal(str(fee))
+                except:
+                    fee = None
+        
+        # Проверяем наличие обязательных полей
+        operation_number = ocr_data.get('operation_number')
+        if operation_number is None or operation_number == '':
+            # Пытаемся извлечь номер операции из raw_text
+            raw_text = ocr_data.get('raw_text', '')
+            if raw_text:
+                # Ищем любые последовательности цифр и букв, которые могут быть номером операции
+                op_matches = re.findall(r'\b([A-Z0-9/-]{6,})\b', raw_text)
+                if op_matches:
+                    operation_number = op_matches[0]
+                else:
+                    operation_number = 'UNKNOWN'
+            else:
+                operation_number = 'UNKNOWN'
         
         return {
             'team_id': team_id,
             'uploaded_by': user_id,
             'date': date,
             'amount': amount,
-            'operation_number': ocr_data.get('operation_number'),
-            'sender': ocr_data.get('sender'),
-            'receiver': ocr_data.get('receiver'),
+            'operation_number': operation_number,
+            'sender': ocr_data.get('sender', ''),
+            'receiver': ocr_data.get('receiver', ''),
             'status': 'pending',
             'file_path': file_path,
-            'organization': ocr_data.get('organization'),
+            'organization': ocr_data.get('organization', ''),
             'fee': fee,
-            'notes': ocr_data.get('notes')
+            'notes': ocr_data.get('notes', '')
         }
