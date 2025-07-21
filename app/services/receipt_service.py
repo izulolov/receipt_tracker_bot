@@ -40,9 +40,7 @@ class ReceiptService(BaseService):
         if not user:
             return None, "User not found"
 
-        team = await self.team_repository.get_user_team(user.id)
-        if not team:
-            return None, "User is not in any team"
+        team_id = user.id # Временное решение, так как в данном этапе не очень понимаю что за team*
 
         try:
             # Create temporary file
@@ -52,7 +50,7 @@ class ReceiptService(BaseService):
 
             # Process receipt using ReceiptProcessor
             receipt = await self.receipt_processor.process_receipt(
-                team_id=team.id,
+                team_id=team_id, # *
                 user_id=user.id,
                 file_data=temp_path.read_bytes(),
                 filename=filename
