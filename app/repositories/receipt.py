@@ -6,8 +6,9 @@ from .base import BaseRepository
 
 
 class ReceiptRepository(BaseRepository):
-    def __init__(self, session):
-        super().__init__(session, Receipt)
+    def __init__(self, session_factory):
+        self.session_factory = session_factory
+        self.model = Receipt
 
     async def get_team_receipts_in_period(
             self,
@@ -15,19 +16,20 @@ class ReceiptRepository(BaseRepository):
             start_date: datetime,
             end_date: datetime
     ) -> List[Receipt]:
-        stmt = (
-            select(Receipt)
-            .where(
-                and_(
-                    Receipt.team_id == team_id,
-                    Receipt.date >= start_date,
-                    Receipt.date <= end_date
+        async with self.session_factory() as session:
+            stmt = (
+                select(Receipt)
+                .where(
+                    and_(
+                        Receipt.team_id == team_id,
+                        Receipt.date >= start_date,
+                        Receipt.date <= end_date
+                    )
                 )
+                .order_by(Receipt.date)
             )
-            .order_by(Receipt.date)
-        )
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
+            result = await session.execute(stmt)
+            return result.scalars().all()
 
     async def create_receipt(
             self,
@@ -38,7 +40,7 @@ class ReceiptRepository(BaseRepository):
             file_path: str,
             status: str = "pending"
     ) -> Receipt:
-        receipt = await self.create(
+        return await self.create(
             team_id=team_id,
             user_id=user_id,
             amount=amount,
@@ -46,4 +48,3 @@ class ReceiptRepository(BaseRepository):
             file_path=file_path,
             status=status
         )
-        return receipt
