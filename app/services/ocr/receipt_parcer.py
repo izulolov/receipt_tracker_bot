@@ -23,10 +23,8 @@ class ReceiptParser:
         date_match = re.search(patterns['date'], text)
         if date_match:
             try:
-                result['date'] = datetime.strptime(
-                    date_match.group(1),
-                    '%d.%m.%Y'
-                )
+                # Сохраняем как datetime объект
+                result['date'] = datetime.strptime(date_match.group(1), '%d.%m.%Y')
             except ValueError:
                 result['date'] = None
 

@@ -68,18 +68,42 @@ class ReceiptProcessor:
             user_id: int,
             file_path: str
     ) -> Dict[str, Any]:
+        # Обрабатываем дату
+        date_value = ocr_data.get('date')
+        if isinstance(date_value, datetime):
+            date = date_value
+        elif isinstance(date_value, str):
+            try:
+                date = datetime.strptime(date_value, '%Y-%m-%d')
+            except ValueError:
+                try:
+                    date = datetime.strptime(date_value, '%d.%m.%Y')
+                except ValueError:
+                    date = datetime.now()
+        else:
+            date = datetime.now()
+        
+        # Обрабатываем сумму
+        amount = ocr_data.get('amount')
+        if amount is not None:
+            amount = Decimal(str(amount))
+        
+        # Обрабатываем комиссию
+        fee = ocr_data.get('fee')
+        if fee is not None:
+            fee = Decimal(str(fee))
+        
         return {
             'team_id': team_id,
             'uploaded_by': user_id,
-            'date': datetime.strptime(ocr_data['date'], '%Y-%m-%d'),
-            'amount': Decimal(str(ocr_data['amount'])),
-            'operation_number': ocr_data['operation_number'],
-            'sender': ocr_data['sender'],
-            'receiver': ocr_data['receiver'],
+            'date': date,
+            'amount': amount,
+            'operation_number': ocr_data.get('operation_number'),
+            'sender': ocr_data.get('sender'),
+            'receiver': ocr_data.get('receiver'),
             'status': 'pending',
             'file_path': file_path,
             'organization': ocr_data.get('organization'),
-            'fee': Decimal(
-                str(ocr_data['fee'])) if 'fee' in ocr_data else None,
+            'fee': fee,
             'notes': ocr_data.get('notes')
         }
