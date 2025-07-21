@@ -8,6 +8,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Uploaded Receipts
+uploads/
+
 # Local DB (SQLite)
 app.db
 

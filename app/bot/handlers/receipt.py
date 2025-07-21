@@ -93,11 +93,32 @@ class ReceiptHandlers:
             )
 
             if receipt:
+                # Форматирование полей для вывода
+                date_str = receipt.date.strftime('%Y-%m-%d %H:%M:%S') if receipt.date else "N/A"
+                amount_str = f"{receipt.amount}" if receipt.amount is not None else "N/A"
+                status_str = receipt.status or "N/A"
+                operation_number_str = receipt.operation_number if hasattr(receipt, 'operation_number') else "N/A"
+                sender_str = receipt.sender if hasattr(receipt, 'sender') else "N/A"
+                receiver_str = receipt.receiver if hasattr(receipt, 'receiver') else "N/A"
+                organization_str = receipt.organization if hasattr(receipt, 'organization') else "N/A"
+                fee_str = receipt.fee if hasattr(receipt, 'fee') else "0"
+                notes_str = receipt.notes if hasattr(receipt, 'notes') else "N/A"
+                # Для upload_by просто используем ID пользователя
+                upload_by_str = str(message.from_user.username)
+                
+                # Формируем сообщение со всеми полями
                 await message.reply(
-                    f"Receipt processed successfully!\n"
-                    f"Amount: {receipt.amount}\n"
-                    f"Date: {receipt.date.strftime('%Y-%m-%d')}\n"
-                    f"Status: {receipt.status}"
+                    f"Receipt processed successfully!\n\n"
+                    f"📅 Date: {date_str}\n"
+                    f"💰 Amount: {amount_str}\n"
+                    f"📊 Status: {status_str}\n"
+                    f"🔢 Operation #: {operation_number_str}\n"
+                    f"📤 Sender: {sender_str}\n"
+                    f"📥 Receiver: {receiver_str}\n"
+                    f"🏢 Organization: {organization_str}\n"
+                    f"💸 Fee: {fee_str}\n"
+                    f"📝 Notes: {notes_str}\n"
+                    f"👤 Uploaded by: {upload_by_str}"
                 )
             else:
                 await message.reply(
