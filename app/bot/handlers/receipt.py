@@ -1,5 +1,5 @@
 # app/bot/handlers/receipt.py
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Union
 
 from aiogram import Router, F
@@ -133,20 +133,49 @@ class ReceiptHandlers:
     async def cmd_list_receipts(self, message: Message):
         """Handle listing receipts command."""
         try:
-            args = message.get_args().split()
-            if len(args) != 2:
-                await message.reply(
-                    "Please provide start and end dates: "
-                    "/list_receipts YYYY-MM-DD YYYY-MM-DD")
-                return
-
-            try:
-                start_date = datetime.strptime(args[0], '%Y-%m-%d')
-                end_date = datetime.strptime(args[1], '%Y-%m-%d')
-            except ValueError:
-                await message.reply(
-                    "Invalid date format. Please use YYYY-MM-DD")
-                return
+            # Получаем текст сообщения и удаляем команду из него
+            full_command = message.text.strip() if message.text else ""
+            args = []
+            
+            # Извлекаем аргументы из текста сообщения
+            if full_command.startswith('/list_receipts'):
+                # Удаляем команду из текста и разбиваем оставшуюся часть на аргументы
+                command_parts = full_command.split(maxsplit=1)
+                if len(command_parts) > 1:
+                    args = command_parts[1].split()
+            
+            # Если аргументы не указаны или указан только один аргумент (одна дата)
+            if len(args) == 0:
+                # Если дата не указана, используем текущий месяц
+                today = datetime.now()
+                start_date = datetime(today.year, today.month, 1)
+                
+                # Определяем последний день текущего месяца
+                if today.month == 12:
+                    end_date = datetime(today.year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = datetime(today.year, today.month + 1, 1) - timedelta(days=1)
+                    
+                end_date = end_date.replace(hour=23, minute=59, second=59)
+            elif len(args) == 1:
+                # Если указана только одна дата, используем ее как начало и конец периода
+                try:
+                    date = datetime.strptime(args[0], '%Y-%m-%d')
+                    start_date = date
+                    end_date = date.replace(hour=23, minute=59, second=59)
+                except ValueError:
+                    await message.reply(
+                        "Неверный формат даты. Используйте формат YYYY-MM-DD")
+                    return
+            else:
+                # Если указаны две даты, используем их как начало и конец периода
+                try:
+                    start_date = datetime.strptime(args[0], '%Y-%m-%d')
+                    end_date = datetime.strptime(args[1], '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                except ValueError:
+                    await message.reply(
+                        "Неверный формат даты. Используйте формат YYYY-MM-DD")
+                    return
 
             receipts = await self.receipt_service.get_user_receipts(
                 telegram_id=message.from_user.id,
@@ -155,29 +184,64 @@ class ReceiptHandlers:
             )
 
             if not receipts:
+                date_range = f"{start_date.strftime('%Y-%m-%d')} по {end_date.strftime('%Y-%m-%d')}"
+                if start_date.date() == end_date.date():
+                    date_range = f"{start_date.strftime('%Y-%m-%d')}"
+                    
                 await message.reply(
-                    f"No receipts found between {args[0]} and {args[1]}")
+                    f"Чеки за период {date_range} не найдены")
                 return
 
-            # Format receipts summary
-            total_amount = sum(float(r.amount) for r in receipts)
-            receipt_list = [
-                f"Receipt {r.id}: {r.date.strftime('%Y-%m-%d')} - "
-                f"Amount: {r.amount} - Status: {r.status}"
-                for r in receipts
-            ]
+            # Форматируем детальную информацию о каждом чеке
+            receipt_details = []
+            total_amount = 0
 
-            response = (
-                    f"Receipts for period: {args[0]} to {args[1]}\n"
-                    f"Total receipts: {len(receipts)}\n"
-                    f"Total amount: {total_amount:.2f}\n\n"
-                    + "\n".join(receipt_list)
+            for r in receipts:
+                total_amount += float(r.amount) if r.amount else 0
+                
+                # Форматирование полей для вывода
+                date_str = r.date.strftime('%Y-%m-%d %H:%M') if r.date else "N/A"
+                amount_str = f"{r.amount}" if r.amount is not None else "N/A"
+                status_str = r.status or "N/A"
+                operation_number_str = r.operation_number if hasattr(r, 'operation_number') and r.operation_number else "N/A"
+                organization_str = r.organization if hasattr(r, 'organization') and r.organization else "N/A"
+                
+                receipt_details.append(
+                    f"📝 Чек #{r.id}\n"
+                    f"📅 Дата: {date_str}\n"
+                    f"💰 Сумма: {amount_str}\n"
+                    f"🏢 Организация: {organization_str}\n"
+                    f"🔢 Номер операции: {operation_number_str}\n"
+                    f"📊 Статус: {status_str}\n"
+                )
+
+            # Формируем общую информацию
+            date_range = f"{start_date.strftime('%Y-%m-%d')} по {end_date.strftime('%Y-%m-%d')}"
+            if start_date.date() == end_date.date():
+                date_range = f"{start_date.strftime('%Y-%m-%d')}"
+                
+            header = (
+                f"📋 Чеки за период: {date_range}\n"
+                f"📊 Всего чеков: {len(receipts)}\n"
+                f"💰 Общая сумма: {total_amount:.2f}\n\n"
             )
 
-            await message.reply(response)
+            # Разбиваем на части, если сообщение слишком длинное
+            max_message_length = 4000  # Максимальная длина сообщения в Telegram
+            current_message = header
+            
+            for detail in receipt_details:
+                if len(current_message + detail + "\n") > max_message_length:
+                    await message.reply(current_message)
+                    current_message = detail + "\n"
+                else:
+                    current_message += detail + "\n"
+                    
+            if current_message:
+                await message.reply(current_message)
 
         except Exception as e:
             logger.error(f"Error listing receipts: {e}", exc_info=True)
             await message.reply(
-                "An error occurred while retrieving receipts. "
-                "Please try again later.")
+                "Произошла ошибка при получении чеков. "
+                "Пожалуйста, попробуйте позже.")

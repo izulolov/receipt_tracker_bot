@@ -79,12 +79,11 @@ class ReceiptService(BaseService):
         if not user:
             return []
 
-        team = await self.team_repository.get_user_team(user.id)
-        if not team:
-            return []
+        # Временное решение: используем user.id как team_id. Это как в методе process_receipt
+        team_id = user.id
 
         return await self.receipt_repository.get_team_receipts_in_period(
-            team.id,
+            team_id,
             start_date,
             end_date
         )
