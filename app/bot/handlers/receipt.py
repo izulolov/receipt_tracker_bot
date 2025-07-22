@@ -94,7 +94,7 @@ class ReceiptHandlers:
 
             if receipt:
                 # Форматирование полей для вывода
-                date_str = receipt.date.strftime('%Y-%m-%d %H:%M:%S') if receipt.date else "N/A"
+                date_str = receipt.date.strftime('%d-%m-%Y %H:%M:%S') if receipt.date else "N/A"
                 amount_str = f"{receipt.amount}" if receipt.amount is not None else "N/A"
                 status_str = receipt.status or "N/A"
                 operation_number_str = receipt.operation_number if hasattr(receipt, 'operation_number') else "N/A"
@@ -200,7 +200,7 @@ class ReceiptHandlers:
                 total_amount += float(r.amount) if r.amount else 0
                 
                 # Форматирование полей для вывода
-                date_str = r.date.strftime('%Y-%m-%d %H:%M') if r.date else "N/A"
+                date_str = r.date.strftime('%d-%m-%Y %H:%M') if r.date else "N/A"
                 amount_str = f"{r.amount}" if r.amount is not None else "N/A"
                 status_str = r.status or "N/A"
                 operation_number_str = r.operation_number if hasattr(r, 'operation_number') and r.operation_number else "N/A"
