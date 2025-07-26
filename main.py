@@ -1,6 +1,7 @@
 # main.py
 import asyncio
 from aiogram import Bot, Dispatcher
+from aiogram.filters import CommandStart, Command
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.bot.handlers.team import setup_team_handlers
@@ -40,10 +41,20 @@ async def main():
                                             settings)
     team_router = setup_team_handlers(team_service)
 
+    # Переопределяем обработчики start и help, чтобы передать им team_service
+    @dp.message(CommandStart())
+    async def start_handler(message, **data):
+        await base.cmd_start(message, team_service=team_service)
+
+    @dp.message(Command("help"))
+    async def help_handler(message, **data):
+        await base.cmd_help(message, team_service=team_service)
+
     # Include all routers
-    dp.include_router(base.router)
+    # Сначала включаем переопределенные обработчики, затем остальные роутеры
     dp.include_router(receipt_router)  # Add receipt router
     dp.include_router(team_router)  # Add team router
+    dp.include_router(base.router)  # Базовый роутер должен быть последним
 
     # Setup database session middleware
     @dp.update.outer_middleware()
@@ -54,7 +65,6 @@ async def main():
             data["receipt_service"] = receipt_service
             data["team_service"] = team_service
             return await handler(event, data)
-
 
     # Setup middleware
     dp.update.outer_middleware(AuthMiddleware())
