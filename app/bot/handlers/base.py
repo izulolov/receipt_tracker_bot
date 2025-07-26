@@ -62,19 +62,20 @@ async def cmd_help(message: types.Message, team_service: TeamService = None):
             has_team = team is not None
         
         base_commands = (
-            "• **/start** - Start the bot and see the welcome message\n\n"
-            "• **/create_team** - Create a new team: `/create_team Team_name`\n\n"
-            "• **/help** - Show this help message\n\n"
+            "• /start - Start the bot and see the welcome message\n\n"
+            "• /create_team - Create a new team: `/create_team Team_name`\n\n"
+            "• /help - Show this help message\n\n"
         )
         
         team_commands = (
-            "• **/upload_receipt** - Upload a new receipt for processing and analysis\n\n"
-            "• **/list_receipts** - View your receipts with various options:\n"
+            "• /upload_receipt - Upload a new receipt for processing and analysis\n\n"
+            "• /list_receipts - View your receipts with various options:\n"
             "  - Without parameters: shows all receipts for the current month\n"
             "  - With one date: `/list_receipts 15.07.2025` shows receipts for this date\n"
             "  - With date range: `/list_receipts 15.07.2025 20.07.2025` shows receipts between these dates\n\n"
-            "• **/invite** - Invite a user to your team: `/invite @username`\n\n"
-            "• **/team_info** - Show information about your current team\n\n"
+            "• /invite - Invite a user to your team: `/invite @username`\n\n"
+            "• /team_info - Show information about your current team\n\n"
+            "• /leave_team - Leave your current team\n\n"
         )
         
         help_text = "📋 Bot usage help\n\n✅ Available commands:\n\n"
@@ -94,7 +95,8 @@ async def cmd_help(message: types.Message, team_service: TeamService = None):
             "- You can always enter commands manually if needed"
         )
         
-        await message.answer(help_text, parse_mode="Markdown")
+        # Отправляем без использования Markdown-форматирования
+        await message.answer(help_text)
         logger.info(f"User {message.from_user.id} requested help")
     except Exception as e:
         logger.error(f"Error in help command: {e}")
@@ -130,6 +132,7 @@ def get_full_keyboard():
             ],
             [
                 KeyboardButton(text="/help"),
+                KeyboardButton(text="/leave_team"),
             ]
         ],
         resize_keyboard=True,

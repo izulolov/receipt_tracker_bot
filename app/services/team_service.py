@@ -27,9 +27,9 @@ class TeamService(BaseService):
         if existing_team_by_name:
             return False, f"A team with the name '{team_name}' already exists. Please choose a different name."
 
-        # Check if user already in team
-        existing_team = await self.team_repository.get_user_team(user.id)
-        if existing_team:
+        # Check if user already in any team
+        if await self.team_repository.is_user_in_any_team(user.id):
+            existing_team = await self.team_repository.get_user_team(user.id)
             return False, f"You are already a member of the team '{existing_team.name}'. Leave your current team first."
 
         try:
@@ -65,9 +65,9 @@ class TeamService(BaseService):
         if not user:
             return False, f"User @{username} not found"
 
-        # Check if user already in a team
-        existing_team = await self.team_repository.get_user_team(user.id)
-        if existing_team:
+        # Check if user already in any team
+        if await self.team_repository.is_user_in_any_team(user.id):
+            existing_team = await self.team_repository.get_user_team(user.id)
             return False, f"User is already a member of the team '{existing_team.name}'"
 
         try:
@@ -158,9 +158,9 @@ class TeamService(BaseService):
         if not user:
             return False, "User not found. Please restart the bot with the /start command."
 
-        # Check if user already in a team
-        existing_team = await self.team_repository.get_user_team(user.id)
-        if existing_team:
+        # Check if user already in any team
+        if await self.team_repository.is_user_in_any_team(user.id):
+            existing_team = await self.team_repository.get_user_team(user.id)
             return False, f"You are already a member of the team '{existing_team.name}'. Leave your current team first."
 
         # Get invite by code
@@ -186,5 +186,67 @@ class TeamService(BaseService):
             )
             
             return True, f"You have successfully joined the team '{team.name}'!"
+        except ValueError as e:
+            return False, str(e)  # Ловим ошибку из add_member
         except Exception as e:
             return False, f"Failed to join the team: {str(e)}"
+
+    async def leave_team(
+            self,
+            telegram_id: int
+    ) -> Tuple[bool, str]:
+        """Leave current team"""
+        user = await self.user_repository.get_by_telegram_id(telegram_id)
+        if not user:
+            return False, "User not found. Please restart the bot with the /start command."
+
+        # Check if user is in a team
+        team = await self.team_repository.get_user_team(user.id)
+        if not team:
+            return False, "You are not a member of any team."
+
+        # Check if user is the only admin
+        is_admin = await self.team_repository.is_admin(team.id, user.id)
+        if is_admin:
+            # Count admins in team
+            admin_count = await self.team_repository.count_team_admins(team.id)
+            if admin_count <= 1:
+                return False, "You are the only administrator of the team. Please assign another administrator before leaving."
+
+        try:
+            success = await self.team_repository.remove_member(team.id, user.id)
+            if success:
+                return True, f"You have successfully left the team '{team.name}'."
+            return False, "Failed to leave the team."
+        except Exception as e:
+            return False, f"An error occurred: {str(e)}"
+        
+    async def leave_team(
+            self,
+            telegram_id: int
+    ) -> Tuple[bool, str]:
+        """Leave current team"""
+        user = await self.user_repository.get_by_telegram_id(telegram_id)
+        if not user:
+            return False, "User not found. Please restart the bot with the /start command."
+
+        # Check if user is in a team
+        team = await self.team_repository.get_user_team(user.id)
+        if not team:
+            return False, "You are not a member of any team."
+
+        # Check if user is the only admin
+        is_admin = await self.team_repository.is_admin(team.id, user.id)
+        if is_admin:
+            # Count admins in team
+            admin_count = await self.team_repository.count_team_admins(team.id)
+            if admin_count <= 1:
+                return False, "You are the only administrator of the team. Please assign another administrator before leaving."
+
+        try:
+            success = await self.team_repository.remove_member(team.id, user.id)
+            if success:
+                return True, f"You have successfully left the team '{team.name}'."
+            return False, "Failed to leave the team."
+        except Exception as e:
+            return False, f"An error occurred: {str(e)}"

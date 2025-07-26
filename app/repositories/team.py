@@ -40,6 +40,10 @@ class TeamRepository(BaseRepository):
     ) -> TeamMember:
         async with self.session_factory() as session:
             try:
+                # Проверяем, не состоит ли пользователь уже в какой-либо команде
+                if await self.is_user_in_any_team(user_id):
+                    raise ValueError("User is already a member of another team")
+                    
                 team_member = TeamMember(
                     team_id=team_id,
                     user_id=user_id,
@@ -159,3 +163,45 @@ class TeamRepository(BaseRepository):
             stmt = select(Team).where(Team.id == team_id)
             result = await session.execute(stmt)
             return result.scalars().first()
+
+    async def is_user_in_any_team(self, user_id: int) -> bool:
+            """Проверяет, состоит ли пользователь в какой-либо команде"""
+            async with self.session_factory() as session:
+                stmt = select(TeamMember).where(TeamMember.user_id == user_id)
+                result = await session.execute(stmt)
+                return result.scalars().first() is not None
+            
+    async def count_team_admins(self, team_id: int) -> int:
+        """Count the number of admins in a team"""
+        async with self.session_factory() as session:
+            stmt = select(TeamMember).where(
+                and_(
+                    TeamMember.team_id == team_id,
+                    TeamMember.is_admin == True
+                )
+            )
+            result = await session.execute(stmt)
+            return len(result.scalars().all())
+
+    async def remove_member(self, team_id: int, user_id: int) -> bool:
+        """Remove a user from a team"""
+        async with self.session_factory() as session:
+            try:
+                stmt = select(TeamMember).where(
+                    and_(
+                        TeamMember.team_id == team_id,
+                        TeamMember.user_id == user_id
+                    )
+                )
+                result = await session.execute(stmt)
+                member = result.scalars().first()
+                
+                if not member:
+                    return False
+                    
+                await session.delete(member)
+                await session.commit()
+                return True
+            except Exception:
+                await session.rollback()
+                raise

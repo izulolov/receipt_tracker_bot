@@ -97,7 +97,8 @@ class TeamHandlers:
                 f"🏢 Team Information:\n\n"
                 f"Name: {team.name}\n"
                 f"Team ID: {team.id}\n"
-                f"{admin_status}{admin_commands}"
+                f"{admin_status}{admin_commands}\n\n"
+                f"Use /leave_team to leave this team."
             )
             
         except Exception as e:
@@ -168,6 +169,29 @@ class TeamHandlers:
         except Exception as e:
             logger.error(f"Error joining team: {e}", exc_info=True)
             await message.reply("An error occurred while joining the team")
+    
+    async def cmd_leave_team(self, message: types.Message):
+        """Handler for /leave_team command"""
+        try:
+            success, result_message = await self.team_service.leave_team(
+                telegram_id=message.from_user.id
+            )
+            
+            if success:
+                # Если пользователь успешно вышел из команды, возвращаем начальную клавиатуру
+                from app.bot.handlers.base import get_initial_keyboard
+                await message.reply(
+                    result_message + "\n\nYou have left your team. Some functions are now unavailable.",
+                    reply_markup=get_initial_keyboard()
+                )
+            else:
+                await message.reply(result_message)
+                
+            logger.info(f"User {message.from_user.id} attempted to leave team: {success}")
+            
+        except Exception as e:
+            logger.error(f"Error leaving team: {e}", exc_info=True)
+            await message.reply("An error occurred while leaving the team")
 
 def setup_team_handlers(team_service: TeamService) -> Router:
     router = Router()
@@ -192,5 +216,9 @@ def setup_team_handlers(team_service: TeamService) -> Router:
     router.message.register(
         handlers.cmd_join_team,
         Command("join_team")
+    )
+    router.message.register(
+        handlers.cmd_leave_team,
+        Command("leave_team")
     )
     return router
