@@ -15,17 +15,17 @@ class TeamHandlers:
 
     async def cmd_create_team(self, message: types.Message):
         try:
-            # Заменяем message.get_args() на парсинг текста сообщения
+            # Replace message.get_args() with parsing the message text
             command_text = message.text.strip()
             parts = command_text.split(maxsplit=1)
             
-            # Проверяем, есть ли аргументы после команды
+            # Check if there are arguments after the command
             if len(parts) < 2:
                 await message.reply(
                     "Please specify a team name: /create_team Team_name")
                 return
             
-            # Получаем название команды (все, что после первого пробела)
+            # Get the team name (everything after the first space)
             team_name = parts[1].strip()
             
             success, result_message = await self.team_service.create_team(
@@ -34,13 +34,13 @@ class TeamHandlers:
             )
 
             if success:
-                # Если команда успешно создана, отправляем сообщение с полной клавиатурой
+                # If the team is successfully created, send a message with the full keyboard
                 await message.reply(
                     result_message + "\n\nNow all bot functions are available to you!",
                     reply_markup=get_full_keyboard()
                 )
             else:
-                # Если произошла ошибка, просто отправляем сообщение об ошибке
+                # If an error occurred, just send the error message
                 await message.reply(result_message)
                 
             logger.info(f"User {message.from_user.id} attempted to create team '{team_name}': {success}")
@@ -51,7 +51,7 @@ class TeamHandlers:
 
     async def cmd_invite(self, message: types.Message):
         try:
-            # Аналогично исправляем парсинг для команды invite
+            # Similarly fix parsing for the invite command
             command_text = message.text.strip()
             parts = command_text.split(maxsplit=1)
             
@@ -79,24 +79,95 @@ class TeamHandlers:
             if not team:
                 await message.reply("You are not a member of any team")
                 return
-                
+                    
             is_admin = await self.team_service.is_team_admin(
                 message.from_user.id, team.id)
             
             admin_status = "✅ You are the administrator of this team" if is_admin else ""
             
+            admin_commands = ""
+            if is_admin:
+                admin_commands = (
+                    "\n\nAdmin commands:"
+                    "\n/invite @username - invite a member by username"
+                    "\n/create_invite [days] - create an invite code (default 7 days)"
+                )
+            
             await message.reply(
                 f"🏢 Team Information:\n\n"
                 f"Name: {team.name}\n"
                 f"Team ID: {team.id}\n"
-                f"{admin_status}\n\n"
-                f"Use /invite @username to invite a member"
+                f"{admin_status}{admin_commands}"
             )
             
         except Exception as e:
             logger.error(f"Error getting team info: {e}", exc_info=True)
             await message.reply("An error occurred while retrieving team information")
 
+    async def cmd_create_invite(self, message: types.Message):
+        """Handler for /create_invite command"""
+        try:
+            # Parse command arguments for expiration days (optional)
+            command_text = message.text.strip()
+            parts = command_text.split(maxsplit=1)
+            
+            expires_in_days = 7  # Default expiration
+            
+            if len(parts) > 1:
+                try:
+                    expires_in_days = int(parts[1].strip())
+                    if expires_in_days < 1 or expires_in_days > 30:
+                        await message.reply(
+                            "Expiration period must be between 1 and 30 days. Default value (7 days) will be used.")
+                        expires_in_days = 7
+                except ValueError:
+                    await message.reply(
+                        "Invalid expiration period format. Default value (7 days) will be used.")
+            
+            success, result_message = await self.team_service.create_invite_link(
+                admin_telegram_id=message.from_user.id,
+                expires_in_days=expires_in_days
+            )
+            
+            result_message = result_message.replace("`", "")
+            await message.reply(result_message)
+            logger.info(f"User {message.from_user.id} created invite: {success}")
+            
+        except Exception as e:
+            logger.error(f"Error creating invite: {e}", exc_info=True)
+            await message.reply("An error occurred while creating the invite code")
+
+    async def cmd_join_team(self, message: types.Message):
+        """Handler for /join_team command"""
+        try:
+            command_text = message.text.strip()
+            parts = command_text.split(maxsplit=1)
+            
+            if len(parts) < 2:
+                await message.reply(
+                    "Please specify the invite code: /join_team INVITE_CODE")
+                return
+            
+            invite_code = parts[1].strip()
+            
+            success, result_message = await self.team_service.join_team_by_code(
+                telegram_id=message.from_user.id,
+                invite_code=invite_code
+            )
+            
+            if success:
+                await message.reply(
+                    result_message + "\n\nNow all bot functions are available to you!",
+                    reply_markup=get_full_keyboard()
+                )
+            else:
+                await message.reply(result_message)
+                
+            logger.info(f"User {message.from_user.id} joined team with code {invite_code}: {success}")
+            
+        except Exception as e:
+            logger.error(f"Error joining team: {e}", exc_info=True)
+            await message.reply("An error occurred while joining the team")
 
 def setup_team_handlers(team_service: TeamService) -> Router:
     router = Router()
@@ -114,5 +185,12 @@ def setup_team_handlers(team_service: TeamService) -> Router:
         handlers.cmd_team_info,
         Command("team_info")
     )
-
+    router.message.register(
+        handlers.cmd_create_invite,
+        Command("create_invite")
+    )
+    router.message.register(
+        handlers.cmd_join_team,
+        Command("join_team")
+    )
     return router

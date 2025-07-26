@@ -1,10 +1,9 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select, and_
-from app.models.team import Team, TeamMember
+from app.models.team import Team, TeamMember, TeamInvite
 from app.models.receipt import Receipt
 from .base import BaseRepository
-
 
 class TeamRepository(BaseRepository):
     def __init__(self, session_factory):
@@ -94,3 +93,69 @@ class TeamRepository(BaseRepository):
             except Exception:
                 await session.rollback()
                 raise
+
+    async def create_invite(
+            self, 
+            team_id: int, 
+            creator_id: int, 
+            expires_in_days: int = 7
+    ) -> TeamInvite:
+        """Create a new invite code for the team"""
+        async with self.session_factory() as session:
+            try:
+                # Generate a unique code
+                while True:
+                    code = TeamInvite.generate_code()
+                    # Check if code already exists
+                    existing = await self.get_invite_by_code(code)
+                    if not existing:
+                        break
+                
+                expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+                
+                invite = TeamInvite(
+                    team_id=team_id,
+                    code=code,
+                    created_by=creator_id,
+                    expires_at=expires_at
+                )
+                
+                session.add(invite)
+                await session.commit()
+                await session.refresh(invite)
+                return invite
+            except Exception:
+                await session.rollback()
+                raise
+
+    async def get_invite_by_code(self, code: str) -> Optional[TeamInvite]:
+        """Get invite by code"""
+        async with self.session_factory() as session:
+            stmt = select(TeamInvite).where(TeamInvite.code == code)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+    async def delete_invite(self, invite_id: int) -> bool:
+        """Delete an invite"""
+        async with self.session_factory() as session:
+            try:
+                stmt = select(TeamInvite).where(TeamInvite.id == invite_id)
+                result = await session.execute(stmt)
+                invite = result.scalars().first()
+                
+                if not invite:
+                    return False
+                    
+                await session.delete(invite)
+                await session.commit()
+                return True
+            except Exception:
+                await session.rollback()
+                raise
+
+    async def get_by_id(self, team_id: int) -> Optional[Team]:
+        """Get team by id"""
+        async with self.session_factory() as session:
+            stmt = select(Team).where(Team.id == team_id)
+            result = await session.execute(stmt)
+            return result.scalars().first()
