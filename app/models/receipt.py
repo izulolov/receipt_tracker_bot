@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, ForeignKey,
-    DateTime, Numeric
+    DateTime, Numeric, Boolean
 )
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -27,6 +27,7 @@ class Receipt(Base):
     notes = Column(String, nullable=True)
     organization = Column(String, nullable=True)
     fee = Column(Numeric(10, 2), nullable=True)
+    is_read = Column(Boolean, default=False)  # Новое поле для отслеживания прочитанных чеков
 
     # Relationships
     team = relationship("Team", back_populates="receipts")

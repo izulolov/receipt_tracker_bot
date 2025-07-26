@@ -27,7 +27,8 @@ class ReceiptProcessor:
             team_id: int,
             user_id: int,
             file_data: bytes,
-            filename: str
+            filename: str,
+            description: str = ""
     ) -> Receipt:
         try:
             # Save file
@@ -51,7 +52,8 @@ class ReceiptProcessor:
                 receipt_data,
                 team_id,
                 user_id,
-                str(file_path)
+                str(file_path),
+                description
             )
 
             # Save to database
@@ -67,7 +69,8 @@ class ReceiptProcessor:
             ocr_data: Dict[str, Any],
             team_id: int,
             user_id: int,
-            file_path: str
+            file_path: str,
+            description: str = ""
     ) -> Dict[str, Any]:
         # Обрабатываем дату
         date_value = ocr_data.get('date')
@@ -172,17 +175,21 @@ class ReceiptProcessor:
             else:
                 operation_number = 'UNKNOWN'
         
-        return {
-            'team_id': team_id,
-            'uploaded_by': user_id,
-            'date': date,
-            'amount': amount,
-            'operation_number': operation_number,
-            'sender': ocr_data.get('sender', ''),
-            'receiver': ocr_data.get('receiver', ''),
-            'status': 'pending',
-            'file_path': file_path,
-            'organization': ocr_data.get('organization', ''),
-            'fee': fee,
-            'notes': ocr_data.get('notes', '')
-        }
+        # Формируем данные для создания чека
+        receipt_data = {
+                'team_id': team_id,
+                'uploaded_by': user_id,  # Изменено с user_id на uploaded_by
+                'date': date,
+                'amount': amount,
+                'operation_number': operation_number,
+                'sender': ocr_data.get('sender', ''),
+                'receiver': ocr_data.get('receiver', ''),
+                'status': 'pending',
+                'file_path': file_path,
+                'organization': ocr_data.get('organization', ''),
+                'fee': fee,
+                'notes': description,  # Используем description как notes
+                'is_read': False  # Новый чек всегда непрочитанный
+            }
+                
+        return receipt_data

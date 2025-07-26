@@ -177,7 +177,8 @@ class ReceiptHandlers:
                         "Неверный формат даты. Используйте формат YYYY-MM-DD")
                     return
 
-            receipts = await self.receipt_service.get_user_receipts(
+            # Здесь исправление: распаковываем результат в два значения
+            receipts, total_count = await self.receipt_service.get_user_receipts(
                 telegram_id=message.from_user.id,
                 start_date=start_date,
                 end_date=end_date
