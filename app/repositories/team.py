@@ -74,3 +74,23 @@ class TeamRepository(BaseRepository):
             )
             result = await session.execute(stmt)
             return result.scalars().all()
+
+    async def get_by_name(self, team_name: str) -> Optional[Team]:
+        """Получить команду по имени"""
+        async with self.session_factory() as session:
+            stmt = select(Team).where(Team.name == team_name)
+            result = await session.execute(stmt)
+            return result.scalars().first()
+
+    async def create(self, name: str) -> Team:
+        """Создать новую команду"""
+        async with self.session_factory() as session:
+            try:
+                team = Team(name=name)
+                session.add(team)
+                await session.commit()
+                await session.refresh(team)
+                return team
+            except Exception:
+                await session.rollback()
+                raise
