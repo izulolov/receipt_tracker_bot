@@ -15,9 +15,12 @@ async def cmd_start(message: types.Message, team_service: TeamService = None):
         
         # Проверяем, состоит ли пользователь в команде
         has_team = False
+        is_admin = False
         if team_service:
             team = await team_service.get_user_team(message.from_user.id)
             has_team = team is not None
+            if has_team:
+                is_admin = await team_service.is_team_admin(message.from_user.id, team.id)
         
         welcome_text = f"👋 Hello, {name}! I'm a bot for managing receipts and expenses.\n\n"
         
@@ -30,7 +33,7 @@ async def cmd_start(message: types.Message, team_service: TeamService = None):
                 "• Work with teams for collaborative expense tracking\n\n"
                 "Use the /help command for detailed information about available commands."
             )
-            keyboard = get_full_keyboard()
+            keyboard = get_full_keyboard(is_admin)
         else:
             # Если пользователь еще не в команде
             welcome_text += (
@@ -57,9 +60,12 @@ async def cmd_help(message: types.Message, team_service: TeamService = None):
     try:
         # Проверяем, состоит ли пользователь в команде
         has_team = False
+        is_admin = False
         if team_service:
             team = await team_service.get_user_team(message.from_user.id)
             has_team = team is not None
+            if has_team:
+                is_admin = await team_service.is_team_admin(message.from_user.id, team.id)
         
         base_commands = (
             "• /start - Start the bot and see the welcome message\n\n"
@@ -73,7 +79,16 @@ async def cmd_help(message: types.Message, team_service: TeamService = None):
             "  - Without parameters: shows all receipts for the current month\n"
             "  - With one date: `/list_receipts 15.07.2025` shows receipts for this date\n"
             "  - With date range: `/list_receipts 15.07.2025 20.07.2025` shows receipts between these dates\n\n"
-            "• /invite - Invite a user to your team: `/invite @username`\n\n"
+        )
+        
+        admin_commands = ""
+        if is_admin:
+            admin_commands = (
+                "• /invite - Invite a user to your team: `/invite @username`\n\n"
+                "• /create_invite - Create an invite code: `/create_invite [days]`\n\n"
+            )
+        
+        common_team_commands = (
             "• /team_info - Show information about your current team\n\n"
             "• /leave_team - Leave your current team\n\n"
         )
@@ -81,7 +96,7 @@ async def cmd_help(message: types.Message, team_service: TeamService = None):
         help_text = "📋 Bot usage help\n\n✅ Available commands:\n\n"
         
         if has_team:
-            help_text += base_commands + team_commands
+            help_text += base_commands + team_commands + admin_commands + common_team_commands
         else:
             help_text += (
                 base_commands + 
@@ -119,22 +134,28 @@ def get_initial_keyboard():
     return keyboard
 
 # Полная клавиатура для пользователя с командой
-def get_full_keyboard():
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(text="/upload_receipt"),
-                KeyboardButton(text="/list_receipts"),
-            ],
-            [
-                KeyboardButton(text="/team_info"),
-                KeyboardButton(text="/invite"),
-            ],
-            [
-                KeyboardButton(text="/help"),
-                KeyboardButton(text="/leave_team"),
-            ]
+def get_full_keyboard(is_admin=False):
+    # Базовые кнопки для всех пользователей команды
+    keyboard_buttons = [
+        [
+            KeyboardButton(text="/upload_receipt"),
+            KeyboardButton(text="/list_receipts"),
         ],
+        [
+            KeyboardButton(text="/team_info"),
+            KeyboardButton(text="/help"),
+        ],
+        [
+            KeyboardButton(text="/leave_team"),
+        ]
+    ]
+    
+    # Добавляем кнопку /invite только для администраторов
+    if is_admin:
+        keyboard_buttons[2].append(KeyboardButton(text="/invite"))
+    
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=keyboard_buttons,
         resize_keyboard=True,
         input_field_placeholder="Select a command or enter a message",
         is_persistent=True

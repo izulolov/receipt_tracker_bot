@@ -51,7 +51,21 @@ class TeamHandlers:
 
     async def cmd_invite(self, message: types.Message):
         try:
-            # Similarly fix parsing for the invite command
+            # Сначала проверяем, является ли пользователь администратором команды
+            team = await self.team_service.get_user_team(message.from_user.id)
+            if not team:
+                await message.reply("You are not a member of any team")
+                return
+                
+            is_admin = await self.team_service.is_team_admin(
+                message.from_user.id, team.id)
+            
+            if not is_admin:
+                await message.reply("This command is only available to team administrators")
+                logger.info(f"Non-admin user {message.from_user.id} attempted to use invite command")
+                return
+            
+            # Если пользователь администратор, продолжаем обработку команды
             command_text = message.text.strip()
             parts = command_text.split(maxsplit=1)
             
@@ -67,7 +81,7 @@ class TeamHandlers:
             )
 
             await message.reply(result_message)
-            logger.info(f"User {message.from_user.id} attempted to invite {username}: {success}")
+            logger.info(f"Admin user {message.from_user.id} attempted to invite {username}: {success}")
 
         except Exception as e:
             logger.error(f"Error inviting user: {e}", exc_info=True)
@@ -108,6 +122,20 @@ class TeamHandlers:
     async def cmd_create_invite(self, message: types.Message):
         """Handler for /create_invite command"""
         try:
+            # Проверяем, является ли пользователь администратором команды
+            team = await self.team_service.get_user_team(message.from_user.id)
+            if not team:
+                await message.reply("You are not a member of any team")
+                return
+                
+            is_admin = await self.team_service.is_team_admin(
+                message.from_user.id, team.id)
+            
+            if not is_admin:
+                await message.reply("This command is only available to team administrators")
+                logger.info(f"Non-admin user {message.from_user.id} attempted to use create_invite command")
+                return
+                
             # Parse command arguments for expiration days (optional)
             command_text = message.text.strip()
             parts = command_text.split(maxsplit=1)
@@ -221,4 +249,4 @@ def setup_team_handlers(team_service: TeamService) -> Router:
         handlers.cmd_leave_team,
         Command("leave_team")
     )
-    return router
+    return router 
