@@ -2,6 +2,7 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart, Command
+from aiogram.fsm.storage.memory import MemoryStorage
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.bot.handlers.team import setup_team_handlers
@@ -26,9 +27,12 @@ async def main():
     # Create session factory
     async_session = async_sessionmaker(engine, expire_on_commit=False)
 
-    # Initialize bot and dispatcher
+    # Initialize storage for FSM
+    storage = MemoryStorage()
+
+    # Initialize bot and dispatcher with storage
     bot = Bot(token=settings.BOT_TOKEN)
-    dp = Dispatcher()
+    dp = Dispatcher(storage=storage)
 
     # Initialize services
     user_service = UserService(async_session)

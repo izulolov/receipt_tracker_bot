@@ -11,7 +11,7 @@ from app.services.base import BaseService
 from app.services.file_storage import FileStorageService
 from app.services.ocr import OCRService, OCRProcessingError
 from app.services.ocr.receipt_processor import ReceiptProcessor
-
+from sqlalchemy import select, func
 
 class ReceiptService(BaseService):
     def __init__(self, session, upload_dir):
@@ -75,56 +75,56 @@ class ReceiptService(BaseService):
         except Exception as e:
             return None, f"Failed to process receipt: {str(e)}"
 
-    async def get_user_receipts(
-            self,
-            telegram_id: int,
-            limit: int = 10,
-            offset: int = 0,
-            start_date: Optional[datetime] = None,
-            end_date: Optional[datetime] = None
-    ) -> Tuple[List[Receipt], int]:
-        """
-        Get user's receipts with pagination and optional date filtering.
-        Returns a tuple of (receipts, total_count)
-        """
+    async def get_user_receipts(self, telegram_id: int, start_date: datetime = None, 
+                            end_date: datetime = None, limit: int = None):
+        """Get user receipts for the given period."""
         user = await self.user_repository.get_by_telegram_id(telegram_id)
         if not user:
             return [], 0
-
-        # Если указаны даты начала и конца, используем метод для получения чеков за период
-        if start_date and end_date:
-            team = await self.team_repository.get_user_team(user.id)
-            if not team:
-                return [], 0
-                
-            # Проверяем, является ли пользователь админом
-            is_admin = await self.team_repository.is_admin(team.id, user.id)
-                
-            receipts = await self.receipt_repository.get_team_receipts_in_period(
-                team_id=team.id,
-                start_date=start_date,
-                end_date=end_date,
-                user_id=user.id,
-                is_admin=is_admin
+            
+        team = await self.team_repository.get_user_team(user.id)
+        if not team:
+            return [], 0
+        
+        # Получаем чеки пользователя за указанный период
+        async with self.session() as session:
+            query = select(Receipt).where(
+                Receipt.team_id == team.id,
+                Receipt.uploaded_by == user.id
             )
             
-            # Применяем пагинацию к полученным результатам
-            total = len(receipts)
-            receipts = receipts[offset:offset + limit]
+            # Добавляем фильтрацию по датам, если они указаны
+            # Используем creation_at вместо date для фильтрации
+            if start_date:
+                query = query.where(Receipt.creation_at >= start_date)
+            if end_date:
+                query = query.where(Receipt.creation_at <= end_date)
             
-            return receipts, total
-        else:
-            # Иначе получаем чеки в зависимости от роли пользователя
-            receipts = await self.receipt_repository.get_user_receipts(
-                user_id=user.id,
-                limit=limit,
-                offset=offset
+            # Сортируем по дате создания (сначала новые)
+            query = query.order_by(Receipt.creation_at.desc())
+            
+            # Применяем ограничение, если оно указано
+            if limit:
+                query = query.limit(limit)
+            
+            result = await session.execute(query)
+            receipts = list(result.scalars().all())
+            
+            # Получаем общее количество чеков (без лимита)
+            count_query = select(func.count()).select_from(Receipt).where(
+                Receipt.team_id == team.id,
+                Receipt.uploaded_by == user.id
             )
             
-            # Получаем общее количество чеков для пагинации
-            total = len(receipts)  # В реальном приложении здесь должен быть отдельный запрос для подсчета общего количества
+            if start_date:
+                count_query = count_query.where(Receipt.creation_at >= start_date)
+            if end_date:
+                count_query = count_query.where(Receipt.creation_at <= end_date)
+                
+            count_result = await session.execute(count_query)
+            total_count = count_result.scalar() or 0
             
-            return receipts, total
+            return receipts, total_count
 
     async def get_user_receipts_in_period(
             self,
