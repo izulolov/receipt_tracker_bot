@@ -67,44 +67,46 @@ async def cmd_help(message: types.Message, team_service: TeamService = None):
             if has_team:
                 is_admin = await team_service.is_team_admin(message.from_user.id, team.id)
         
-        base_commands = (
+        # Команды для пользователя без команды
+        no_team_commands = (
             "• /start - Start the bot and see the welcome message\n\n"
             "• /create_team - Create a new team: `/create_team Team_name`\n\n"
             "• /help - Show this help message\n\n"
+            "\nℹ️ After creating a team, additional commands for working with receipts and team management will become available."
         )
         
-        team_commands = (
+        # Базовые команды для всех пользователей с командой
+        regular_user_commands = (
+            "• /start - Start the bot and see the welcome message\n\n"
             "• /upload_receipt - Upload a new receipt for processing and analysis\n\n"
             "• /list_receipts - View your receipts with various options:\n"
             "  - Without parameters: shows all receipts for the current month\n"
             "  - With one date: `/list_receipts 15.07.2025` shows receipts for this date\n"
             "  - With date range: `/list_receipts 15.07.2025 20.07.2025` shows receipts between these dates\n\n"
-        )
-        
-        admin_commands = ""
-        if is_admin:
-            admin_commands = (
-                "• /invite - Invite a user to your team: `/invite @username`\n\n"
-                "• /create_invite - Create an invite code: `/create_invite [days]`\n\n"
-            )
-        
-        common_team_commands = (
             "• /team_info - Show information about your current team\n\n"
             "• /leave_team - Leave your current team\n\n"
         )
         
+        # Дополнительные команды только для администраторов
+        admin_commands = (
+            "• /invite - Invite a user to your team: `/invite @username`\n\n"
+            "• /create_invite - Create an invite code: `/create_invite [days]`\n\n"
+        )
+        
         help_text = "📋 Bot usage help\n\n✅ Available commands:\n\n"
         
-        if has_team:
-            help_text += base_commands + team_commands + admin_commands + common_team_commands
+        if not has_team:
+            # Для пользователя без команды
+            help_text += no_team_commands
+        elif is_admin:
+            # Для администратора команды
+            help_text += regular_user_commands + admin_commands
         else:
-            help_text += (
-                base_commands + 
-                "\nℹ️ After creating a team, additional commands for working with receipts and team management will become available."
-            )
+            # Для обычного пользователя команды
+            help_text += regular_user_commands
         
         help_text += (
-            "Tips:\n"
+            "\nTips:\n"
             "- Use keyboard buttons for quick access to commands\n"
             "- When uploading receipts, make sure the image is clear and readable\n"
             "- You can always enter commands manually if needed"
