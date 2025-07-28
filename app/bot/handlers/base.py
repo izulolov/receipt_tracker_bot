@@ -29,7 +29,6 @@ async def cmd_start(message: types.Message, team_service: TeamService = None):
             welcome_text += (
                 "Here's what I can do:\n"
                 "• Upload and analyze receipts\n"
-                "• Track expenses by categories\n"
                 "• Work with teams for collaborative expense tracking\n\n"
                 "Use the /help command for detailed information about available commands."
             )
@@ -37,9 +36,15 @@ async def cmd_start(message: types.Message, team_service: TeamService = None):
         else:
             # Если пользователь еще не в команде
             welcome_text += (
-                "To start using all the bot's functions, first create a team.\n\n"
-                "Use the command /create_team Team_name to create a new team.\n\n"
-                "After creating a team, all bot functions will become available to you."
+                "To start using all the bot's functions, you need to be part of a team.\n\n"
+                "You have two options:\n\n"
+                "1️⃣ Create your own team using the command:\n"
+                "/create_team Team_name\n\n"
+                "2️⃣ Join an existing team in one of these ways:\n"
+                "• Use the invitation code: /join_team XXXXXXXX (where XXXXXXXX is the code provided by the team admin)\n"
+                "• Ask the team admin to invite you with: /invite @" + (message.from_user.username or "your_username") + "\n\n"
+                "After joining or creating a team, all bot functions will become available to you.\n\n"
+                "P.S. You can only join one team — we are not ready for your double agent lifestyle yet! 🕵️‍♂️"
             )
             keyboard = get_initial_keyboard()
         
