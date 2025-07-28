@@ -1,13 +1,22 @@
 # app/bot/handlers/team.py
-import logging
+import random
+import string
 from aiogram import Router, types
 from aiogram.filters import Command
-
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from app.services.team_service import TeamService
 from app.bot.handlers.base import get_full_keyboard
-
 from app.core.logging import logger
 
+# Добавим класс состояний для выхода из команды
+class LeaveTeamStates(StatesGroup):
+    waiting_for_confirmation = State()
+
+# Добавим функцию для генерации случайного кода
+def generate_confirmation_code(length=6):
+    """Generate a random confirmation code"""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 class TeamHandlers:
     def __init__(self, team_service: TeamService):
@@ -209,28 +218,81 @@ class TeamHandlers:
             logger.error(f"Error joining team: {e}", exc_info=True)
             await message.reply("An error occurred while joining the team")
     
-    async def cmd_leave_team(self, message: types.Message):
+    async def cmd_leave_team(self, message: types.Message, state: FSMContext):
         """Handler for /leave_team command"""
         try:
-            success, result_message = await self.team_service.leave_team(
-                telegram_id=message.from_user.id
-            )
+            # Проверяем, состоит ли пользователь в команде
+            team = await self.team_service.get_user_team(message.from_user.id)
+            if not team:
+                await message.reply("You are not a member of any team")
+                return
             
-            if success:
-                # Если пользователь успешно вышел из команды, возвращаем начальную клавиатуру
-                from app.bot.handlers.base import get_initial_keyboard
-                await message.reply(
-                    result_message + "\n\nYou have left your team. Some functions are now unavailable.",
-                    reply_markup=get_initial_keyboard()
-                )
-            else:
-                await message.reply(result_message)
+            # Получаем текущее состояние пользователя
+            current_state = await state.get_state()
+            
+            # Если пользователь еще не в состоянии подтверждения, генерируем код
+            if current_state != LeaveTeamStates.waiting_for_confirmation.state:
+                # Генерируем код подтверждения
+                confirmation_code = generate_confirmation_code()
                 
-            logger.info(f"User {message.from_user.id} attempted to leave team: {success}")
+                # Сохраняем код в состоянии пользователя
+                await state.set_state(LeaveTeamStates.waiting_for_confirmation)
+                await state.update_data(confirmation_code=confirmation_code)
+                
+                await message.reply(
+                    f"⚠️ Are you sure you want to leave the team '{team.name}'?\n\n"
+                    f"This action cannot be undone. To confirm, please enter the following code:\n\n"
+                    f"{confirmation_code}\n\n"
+                    f"If you changed your mind, use /cancel to abort."
+                )
+                return
             
+            # Если пользователь уже в состоянии подтверждения, проверяем код
+            user_data = await state.get_data()
+            saved_code = user_data.get('confirmation_code')
+            user_input = message.text.strip()
+            
+            if user_input == saved_code:
+                # Код верный, выполняем выход из команды
+                success, result_message = await self.team_service.leave_team(
+                    telegram_id=message.from_user.id
+                )
+                
+                # Сбрасываем состояние
+                await state.clear()
+                
+                if success:
+                    # Если пользователь успешно вышел из команды, возвращаем начальную клавиатуру
+                    from app.bot.handlers.base import get_initial_keyboard
+                    await message.reply(
+                        result_message + "\n\nYou have left your team. Some functions are now unavailable.",
+                        reply_markup=get_initial_keyboard()
+                    )
+                else:
+                    await message.reply(result_message)
+                    
+                logger.info(f"User {message.from_user.id} left team: {success}")
+            else:
+                # Код неверный
+                await message.reply(
+                    "❌ Incorrect confirmation code. Please try again or use /cancel to abort."
+                )
+                
         except Exception as e:
             logger.error(f"Error leaving team: {e}", exc_info=True)
             await message.reply("An error occurred while leaving the team")
+            # Сбрасываем состояние в случае ошибки
+            await state.clear()
+
+    async def cmd_cancel(self, message: types.Message, state: FSMContext):
+        """Handler for /cancel command"""
+        current_state = await state.get_state()
+        if current_state is None:
+            await message.reply("Nothing to cancel.")
+            return
+        
+        await state.clear()
+        await message.reply("Action canceled.")
 
 def setup_team_handlers(team_service: TeamService) -> Router:
     router = Router()
@@ -259,5 +321,15 @@ def setup_team_handlers(team_service: TeamService) -> Router:
     router.message.register(
         handlers.cmd_leave_team,
         Command("leave_team")
+    )
+     # Добавляем обработчик для команды cancel
+    router.message.register(
+        handlers.cmd_cancel,
+        Command("cancel")
+    )
+    # Добавляем обработчик для проверки кода подтверждения
+    router.message.register(
+        handlers.cmd_leave_team,
+        LeaveTeamStates.waiting_for_confirmation
     )
     return router 

@@ -74,11 +74,16 @@ async def cmd_help(message: types.Message, team_service: TeamService = None):
         
         # Команды для пользователя без команды
         no_team_commands = (
-            "• /start - Start the bot and see the welcome message\n\n"
-            "• /create_team - Create a new team: `/create_team Team_name`\n\n"
-            "• /help - Show this help message\n\n"
-            "\nℹ️ After creating a team, additional commands for working with receipts and team management will become available."
-        )
+                "To start using all the bot's functions, you need to be part of a team.\n\n"
+                "You have two options:\n\n"
+                "1️⃣ Create your own team using the command:\n"
+                "/create_team Team_name\n\n"
+                "2️⃣ Join an existing team in one of these ways:\n"
+                "• Use the invitation code: /join_team XXXXXXXX (where XXXXXXXX is the code provided by the team admin)\n"
+                "• Ask the team admin to invite you with: /invite @" + (message.from_user.username or "your_username") + "\n\n"
+                "After joining or creating a team, all bot functions will become available to you.\n\n"
+                "P.S. You can only join one team — we are not ready for your double agent lifestyle yet! 🕵️‍♂️"
+            )
         
         # Базовые команды для всех пользователей с командой
         regular_user_commands = (
@@ -109,13 +114,6 @@ async def cmd_help(message: types.Message, team_service: TeamService = None):
         else:
             # Для обычного пользователя команды
             help_text += regular_user_commands
-        
-        help_text += (
-            "\nTips:\n"
-            "- Use keyboard buttons for quick access to commands\n"
-            "- When uploading receipts, make sure the image is clear and readable\n"
-            "- You can always enter commands manually if needed"
-        )
         
         # Отправляем без использования Markdown-форматирования
         await message.answer(help_text)
