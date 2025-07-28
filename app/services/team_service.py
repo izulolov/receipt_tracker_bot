@@ -220,3 +220,21 @@ class TeamService(BaseService):
             return False, "Failed to leave the team."
         except Exception as e:
             return False, f"An error occurred: {str(e)}"
+        
+    async def get_team_member_count(self, team_id: int) -> int:
+        """
+        Get the number of members in a team
+        
+        Args:
+            team_id: ID of the team
+            
+        Returns:
+            int: Number of team members
+        """
+        try:
+            return await self.team_repository.count_team_members(team_id)
+        except Exception as e:
+            # Импортируем logger из правильного модуля
+            from app.core.logging import logger
+            logger.error(f"Error counting team members: {e}", exc_info=True)
+            return 0  # Return 0 if there's an error

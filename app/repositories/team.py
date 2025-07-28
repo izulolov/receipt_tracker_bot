@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime, timedelta
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from app.models.team import Team, TeamMember, TeamInvite
 from app.models.receipt import Receipt
 from .base import BaseRepository
@@ -205,3 +205,13 @@ class TeamRepository(BaseRepository):
             except Exception:
                 await session.rollback()
                 raise
+
+    async def count_team_members(self, team_id: int) -> int:
+        """Count total number of members in a team"""
+        async with self.session_factory() as session:
+            
+            stmt = select(func.count()).select_from(TeamMember).where(
+                TeamMember.team_id == team_id
+            )
+            result = await session.execute(stmt)
+            return result.scalar_one() or 0

@@ -97,25 +97,36 @@ class TeamHandlers:
             is_admin = await self.team_service.is_team_admin(
                 message.from_user.id, team.id)
             
+            # Получаем количество участников команды
+            member_count = await self.team_service.get_team_member_count(team.id)
+            
             admin_status = "✅ You are the administrator of this team" if is_admin else ""
             
             admin_commands = ""
             if is_admin:
                 admin_commands = (
-                    "\n\nAdmin commands:"
-                    "\n/invite @username - invite a member by username"
-                    "\n/create_invite [days] - create an invite code (default 7 days)"
+                    "\n\nAdmin commands:\n"
+                    "/create_invite [days] - create an invite code (default 7 days). "
+                    "If you simply send /create_invite to the bot, a code will be created that is valid for 7 days. "
+                    "You can also specify how many days the team connection code will be valid for.\n\n"
+                    "/join_team [code] - this is how a user can join a team by entering the command /join_team xxxxxxxx "
+                    "in their bot, where xxxxxxxx is the code generated in the \"/create_invite [days]\" step.\n\n"
+                    "/invite @username - Another way to add a user is by using @username. "
+                    "The user must start the bot, after which the administrator should send the message /invite @username to the bot. "
+                    "The admin will receive a message about the successful operation, and the user should press the start button "
+                    "in the bot again to gain access to the team functions."
                 )
             
             await message.reply(
                 f"🏢 Team Information:\n\n"
                 f"Name: {team.name}\n"
-                f"Team ID: {team.id}\n"
+                f"Number of team members: {member_count}\n"
                 f"{admin_status}{admin_commands}\n\n"
-                f"Use /leave_team to leave this team."
+                f"Use /leave_team to leave this team. You will need to enter a confirmation code to exit the team."
             )
             
         except Exception as e:
+            from app.core.logging import logger
             logger.error(f"Error getting team info: {e}", exc_info=True)
             await message.reply("An error occurred while retrieving team information")
 
