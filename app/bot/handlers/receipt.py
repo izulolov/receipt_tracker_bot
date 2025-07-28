@@ -197,7 +197,8 @@ class ReceiptHandlers:
             receipt_details = []
             total_amount = 0
 
-            for r in receipts:
+            # Используем порядковый номер вместо ID из базы данных
+            for index, r in enumerate(receipts, 1):
                 total_amount += float(r.amount) if r.amount else 0
                 
                 # Форматирование полей для вывода
@@ -208,7 +209,7 @@ class ReceiptHandlers:
                 organization_str = r.organization if hasattr(r, 'organization') and r.organization else "N/A"
                 
                 receipt_details.append(
-                    f"📝 Чек #{r.id}\n"
+                    f"📝 Чек #{index}\n"  # Используем порядковый номер вместо r.id
                     f"📅 Дата: {date_str}\n"
                     f"💰 Сумма: {amount_str}\n"
                     f"🏢 Организация: {organization_str}\n"
