@@ -1,4 +1,3 @@
-# app/core/config.py
 from pathlib import Path
 from typing import Optional
 
@@ -12,6 +11,11 @@ class Settings(BaseSettings):
     # Database settings
     DATABASE_URL: str = "sqlite+aiosqlite:///./app.db"
     DB_ECHO: bool = False
+    
+    # Добавляем поддержку переменных PostgreSQL/Нужен для Docker
+    POSTGRES_USER: Optional[str] = None
+    POSTGRES_PASSWORD: Optional[str] = None
+    POSTGRES_DB: Optional[str] = None
 
     # File upload settings
     UPLOAD_DIR: Path = Path("uploads")
@@ -33,6 +37,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Добавляем эту строку для игнорирования лишних переменных
 
 
 settings = Settings()
